@@ -47,6 +47,7 @@ type Stack struct {
 	ControllerPin       string  `json:"controller_pin,omitempty"`
 	DashboardLoginToken string  `json:"dashboard_login_token,omitempty"`
 	Domain              *Domain `json:"domain"`
+	CACert              string  `json:"-"`
 
 	EventChan chan *Event   `json:"-"`
 	ErrChan   chan error    `json:"-"`
@@ -717,11 +718,12 @@ func (s *Stack) bootstrap() error {
 	var keyData struct {
 		Key string `json:"data"`
 	}
-	var pinData struct {
-		Pin string `json:"pin"`
-	}
 	var loginTokenData struct {
 		Token string `json:"data"`
+	}
+	var controllerCertData struct {
+		Pin    string `json:"pin"`
+		CACert string `json:"ca_cert"`
 	}
 	output := json.NewDecoder(stdout)
 	for {
@@ -750,7 +752,7 @@ func (s *Stack) bootstrap() error {
 				return err
 			}
 		case "controller-cert":
-			if err := json.Unmarshal(*step.Data, &pinData); err != nil {
+			if err := json.Unmarshal(*step.Data, &controllerCertData); err != nil {
 				return err
 			}
 		case "dashboard-login-token":
@@ -761,12 +763,13 @@ func (s *Stack) bootstrap() error {
 			break
 		}
 	}
-	if keyData.Key == "" || pinData.Pin == "" {
+	if keyData.Key == "" || controllerCertData.Pin == "" {
 		return err
 	}
 
 	s.ControllerKey = keyData.Key
-	s.ControllerPin = pinData.Pin
+	s.ControllerPin = controllerCertData.Pin
+	s.CACert = controllerCertData.CACert
 	s.DashboardLoginToken = loginTokenData.Token
 
 	if err := sess.Wait(); err != nil {

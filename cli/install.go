@@ -13,7 +13,9 @@ import (
 
 func init() {
 	register("install", runInstaller, fmt.Sprintf(`
-usage: flynn install <target> [-n <instances>] [-t <instance-type>] [--aws-access-key-id=<key-id>] [--aws-secret-access-key=<secret>] [--aws-region=<region>] [--vpc-cidr=<cidr>] [--subnet-cidr=<cidr>]
+usage: flynn install [<target>] [-n <instances>] [-t <instance-type>] [--aws-access-key-id=<key-id>] [--aws-secret-access-key=<secret>] [--aws-region=<region>] [--vpc-cidr=<cidr>] [--subnet-cidr=<cidr>]
+
+Running flynn install without a target will start a web server for the installer app
 
 Targets:
 	aws  creates a flynn cluster on EC2
@@ -34,6 +36,11 @@ Examples:
 }
 
 func runInstaller(args *docopt.Args) error {
+	if args.String["<target>"] == "" {
+		installer.ServeHTTP()
+		return nil
+	}
+
 	if args.String["<target>"] != "aws" {
 		return errors.New("Invalid install target")
 	}
