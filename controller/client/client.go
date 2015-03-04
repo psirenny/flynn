@@ -322,6 +322,7 @@ outer:
 				}
 				continue
 			}
+			fmt.Printf("===> %s DeployAppRelease got deploy event: %+v\n", time.Now().Format("2006-01-02T15:04:05.999"), e)
 			switch e.Status {
 			case "complete":
 				break outer
