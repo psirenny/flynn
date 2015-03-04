@@ -1,6 +1,7 @@
 package ring
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -83,5 +84,86 @@ func (s *S) TestReadLastN(c *C) {
 	c.Assert(cap(res), Equals, 5)
 	for i := 0; i < 5; i++ {
 		c.Assert(string(res[i].Msg), Equals, strconv.Itoa(b.Capacity()-5+i))
+	}
+}
+
+func (s *S) TestReadLastNAndSubscribe(c *C) {
+	b := NewBuffer()
+	b.Add(&rfc5424.Message{Msg: []byte("preexisting message 1")})
+	b.Add(&rfc5424.Message{Msg: []byte("preexisting message 2")})
+
+	messages, msgc, cancel := b.ReadLastNAndSubscribe(1)
+	defer cancel()
+
+	c.Assert(messages, HasLen, 1)
+	c.Assert(string(messages[0].Msg), Equals, "preexisting message 2")
+
+	select {
+	case msg := <-msgc:
+		c.Fatalf("expected no message, got %v", msg)
+	default:
+	}
+
+	b.Add(&rfc5424.Message{Msg: []byte("new message 1")})
+	b.Add(&rfc5424.Message{Msg: []byte("new message 2")})
+
+	select {
+	case msg := <-msgc:
+		c.Assert(string(msg.Msg), Equals, "new message 1")
+	default:
+		c.Fatalf("expected message, got none")
+	}
+	select {
+	case msg := <-msgc:
+		c.Assert(string(msg.Msg), Equals, "new message 2")
+	default:
+		c.Fatalf("expected message, got none")
+	}
+
+	cancel()
+	c.Assert(b.subs, HasLen, 0)
+	select {
+	case msg := <-msgc:
+		c.Assert(msg, IsNil)
+	default:
+		c.Fatalf("expected msgc to be closed")
+	}
+}
+
+func (s *S) TestSubscribe(c *C) {
+	b := NewBuffer()
+	b.Add(&rfc5424.Message{Msg: []byte("preexisting message")})
+
+	msgc, cancel := b.Subscribe()
+	defer cancel()
+
+	c.Assert(cap(msgc), Equals, 1000)
+
+	select {
+	case msg := <-msgc:
+		c.Fatalf("expected no message, got %v", msg)
+	default:
+	}
+
+	b.Add(&rfc5424.Message{Msg: []byte("new message 1")})
+	b.Add(&rfc5424.Message{Msg: []byte("new message 2")})
+	c.Assert(msgc, HasLen, 2)
+
+	for i := 1; i < 3; i++ {
+		select {
+		case msg := <-msgc:
+			c.Assert(string(msg.Msg), Equals, fmt.Sprintf("new message %d", i))
+		default:
+			c.Fatalf("got no message i=%d", i)
+		}
+	}
+
+	cancel()
+	c.Assert(b.subs, HasLen, 0)
+	select {
+	case msg := <-msgc:
+		c.Assert(msg, IsNil)
+	default:
+		c.Fatalf("expected msgc to be closed")
 	}
 }
