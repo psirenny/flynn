@@ -20,6 +20,7 @@ import (
 	"github.com/flynn/flynn/controller/schema"
 	ct "github.com/flynn/flynn/controller/types"
 	"github.com/flynn/flynn/discoverd/client"
+	logaggc "github.com/flynn/flynn/logaggregator/client"
 	"github.com/flynn/flynn/pkg/cluster"
 	"github.com/flynn/flynn/pkg/ctxhelper"
 	"github.com/flynn/flynn/pkg/httphelper"
@@ -74,7 +75,11 @@ func main() {
 		shutdown.Fatal(err)
 	}
 
-	sc := routerc.New()
+	lc, err := logaggc.New("")
+	if err != nil {
+		shutdown.Fatal(err)
+	}
+	rc := routerc.New()
 
 	hb, err := discoverd.DefaultClient.AddServiceAndRegisterInstance("flynn-controller", &discoverd.Instance{
 		Addr:  addr,
@@ -91,14 +96,22 @@ func main() {
 		hb.Close()
 	})
 
-	handler := appHandler(handlerConfig{db: db, cc: cc, sc: sc, pgxpool: pgxpool, key: os.Getenv("AUTH_KEY")})
+	handler := appHandler(handlerConfig{
+		db:      db,
+		cc:      cc,
+		lc:      *lc,
+		rc:      rc,
+		pgxpool: pgxpool,
+		key:     os.Getenv("AUTH_KEY"),
+	})
 	shutdown.Fatal(http.ListenAndServe(addr, handler))
 }
 
 type handlerConfig struct {
 	db      *postgres.DB
 	cc      clusterClient
-	sc      routerc.Client
+	lc      logaggc.Client
+	rc      routerc.Client
 	pgxpool *pgx.ConnPool
 	key     string
 }
@@ -135,7 +148,7 @@ func appHandler(c handlerConfig) http.Handler {
 	providerRepo := NewProviderRepo(c.db)
 	keyRepo := NewKeyRepo(c.db)
 	resourceRepo := NewResourceRepo(c.db)
-	appRepo := NewAppRepo(c.db, os.Getenv("DEFAULT_ROUTE_DOMAIN"), c.sc)
+	appRepo := NewAppRepo(c.db, os.Getenv("DEFAULT_ROUTE_DOMAIN"), c.rc)
 	artifactRepo := NewArtifactRepo(c.db)
 	releaseRepo := NewReleaseRepo(c.db)
 	jobRepo := NewJobRepo(c.db)
@@ -152,7 +165,8 @@ func appHandler(c handlerConfig) http.Handler {
 		resourceRepo:   resourceRepo,
 		deploymentRepo: deploymentRepo,
 		clusterClient:  c.cc,
-		routerc:        c.sc,
+		logaggc:        c.lc,
+		routerc:        c.rc,
 	}
 
 	httpRouter := httprouter.New()
@@ -164,6 +178,7 @@ func appHandler(c handlerConfig) http.Handler {
 	crud(httpRouter, "keys", ct.Key{}, keyRepo)
 
 	httpRouter.POST("/apps/:apps_id", httphelper.WrapHandler(api.UpdateApp))
+	httpRouter.GET("/apps/:apps_id/log", httphelper.WrapHandler(api.appLookup(api.AppLog)))
 
 	httpRouter.PUT("/apps/:apps_id/formations/:releases_id", httphelper.WrapHandler(api.appLookup(api.PutFormation)))
 	httpRouter.GET("/apps/:apps_id/formations/:releases_id", httphelper.WrapHandler(api.appLookup(api.GetFormation)))
@@ -228,6 +243,7 @@ type controllerAPI struct {
 	resourceRepo   *ResourceRepo
 	deploymentRepo *DeploymentRepo
 	clusterClient  clusterClient
+	logaggc        logaggc.Client
 	routerc        routerc.Client
 }
 
