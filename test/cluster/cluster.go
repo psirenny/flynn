@@ -439,6 +439,7 @@ git config user.name "CI"
 git merge origin/master
 {{ end }}
 
+docker pull flynn/busybox
 make
 
 if [[ -f test/scripts/debug-info.sh ]]; then
