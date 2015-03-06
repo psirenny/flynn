@@ -2,7 +2,7 @@
   {
     "id": "require-env",
     "action": "require-env",
-    "vars": ["CLUSTER_DOMAIN"]
+    "vars": ["CLUSTER_DOMAIN", "LOGIN_TOKEN"]
   },
   {
     "id": "pg-password",
@@ -309,7 +309,7 @@
         "CONTROLLER_KEY": "{{ (index .StepData \"controller-key\").Data }}",
         "URL": "https://dashboard.{{ getenv \"CLUSTER_DOMAIN\" }}",
         "SESSION_SECRET": "{{ (index .StepData \"dashboard-session-secret\").Data }}",
-        "LOGIN_TOKEN": "{{ (index .StepData \"dashboard-login-token\").Data }}",
+        "LOGIN_TOKEN": "{{ getenv \"LOGIN_TOKEN\" }}",
         "APP_NAME": "dashboard",
         "STATIC_PATH": "/app",
         "SECURE_COOKIES": "true",
@@ -356,6 +356,6 @@
   {
     "id": "log-complete",
     "action": "log",
-    "output": "\n\nFlynn bootstrapping complete. Install the flynn-cli (see https://cli.flynn.io for instructions) and paste the line below into a terminal window:\n\nflynn cluster add -g {{ getenv \"CLUSTER_DOMAIN\" }}:2222 -p {{ (index .StepData \"controller-cert\").Pin }} default https://controller.{{ getenv \"CLUSTER_DOMAIN\" }} {{ (index .StepData \"controller-key\").Data }}\n\nThe built-in dashboard can be accessed at http://dashboard.{{ getenv \"CLUSTER_DOMAIN\" }} with login token {{ (index .StepData \"dashboard-login-token\").Data }}"
+    "output": "\n\nFlynn bootstrapping complete. Install the flynn-cli (see https://cli.flynn.io for instructions) and paste the line below into a terminal window:\n\nflynn cluster add -g {{ getenv \"CLUSTER_DOMAIN\" }}:2222 -p {{ (index .StepData \"controller-cert\").Pin }} default https://controller.{{ getenv \"CLUSTER_DOMAIN\" }} {{ (index .StepData \"controller-key\").Data }}\n\nThe built-in dashboard can be accessed at http://dashboard.{{ getenv \"CLUSTER_DOMAIN\" }} with login token {{ getenv \"LOGIN_TOKEN\" }}"
   }
 ]
